@@ -50,6 +50,17 @@
   </head>
   <body>
     <div class="day-header" id="dayOfWeek"></div>
+    <button id="debugToggleBtn" class="debug-toggle-btn" type="button">Debug Time</button>
+    <div id="debugPanel" class="debug-panel" style="display:none;">
+      <div class="debug-row">
+        <input id="debugTimeInput" type="time" step="1" value="08:15:00" />
+      </div>
+      <div class="debug-row">
+        <button id="debugApplyBtn" type="button">Применить</button>
+        <button id="debugResetBtn" type="button">Сброс</button>
+      </div>
+      <div id="debugStateLabel">Режим: реальное время</div>
+    </div>
 
     <!-- ПЕРВЫЙ КОНТЕЙНЕР: карточки смен + день рождения -->
     <div class="container">
@@ -57,7 +68,6 @@
       <!-- ИЗМЕНЕНО: карточки смен обёрнуты в .shifts-row для 16:9 -->
       <div class="shifts-row">
         <div class="lesson-card shift-card shift-card-1">
-          <div class="shift-number">1 смена</div>
           <div class="lesson-header">
             <div id="lesson1-name"></div>
             <div id="lesson1-remaining">
@@ -77,28 +87,19 @@
             <div id="lesson1-progress"></div>
           </div>
         </div>
-        <div class="lesson-card shift-card shift-card-2">
-          <div class="shift-number">2 смена</div>
-          <div class="lesson-header">
-            <div id="lesson2-name"></div>
-            <div id="lesson2-remaining">
-              <span class="hourglass-icon">
-                <svg width="20" height="20" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M19 3H5C4.44772 3 4 3.44772 4 4V6.58579C4 7.11622 4.21071 7.62493 4.58579 8L8 11.4142V12.5858L4.58579 16C4.21071 16.3751 4 16.8838 4 17.4142V20C4 20.5523 4.44772 21 5 21H19C19.5523 21 20 20.5523 20 20V17.4142C20 16.8838 19.7893 16.3751 19.4142 16L16 12.5858V11.4142L19.4142 8C19.7893 7.62493 20 7.11622 20 6.58579V4C20 3.44772 19.5523 3 19 3ZM18 6H6V5H18V6ZM12 11V13L15.4142 16.4142C15.7893 16.7893 16 17.298 16 17.8284V19H8V17.8284C8 17.298 8.21071 16.7893 8.58579 16.4142L12 13V11Z" fill="currentColor"/>
-                </svg>
-              </span>
-              <span class="remaining-text"></span>
-            </div>
-          </div>
-          <div class="progress-time-labels">
-            <span id="lesson2-start-time"></span>
-            <span id="lesson2-end-time"></span>
-          </div>
-          <div class="progress-bar">
-            <div id="lesson2-progress"></div>
-          </div>
-        </div>
       </div><!-- /shifts-row -->
+
+      <div class="lesson-card class-schedule-card">
+        <div class="class-schedule-header">
+          <div class="schedule-header">Расписание класса на сегодня</div>
+          <div class="class-name-pill" id="selectedClassName">7А-32</div>
+        </div>
+        <div class="class-slider-wrap">
+          <button type="button" class="class-nav-btn" id="classPrev" aria-label="Предыдущий класс">‹</button>
+          <button type="button" class="class-nav-btn" id="classNext" aria-label="Следующий класс">›</button>
+        </div>
+        <div id="classDaySchedule"></div>
+      </div>
 
       <div id="birthday-cards-container"></div>
     </div><!-- /container -->
@@ -120,17 +121,9 @@
 
           <div class="full-schedule-container">
             <div class="shift-schedule">
-              <div class="schedule-index">1 смена</div>
               <div id="shift1-full">
                 <div class="lesson-item"><div class="lesson-number">1</div><div class="lesson-time">8:15 - 8:55</div></div>
                 <div class="lesson-item"><div class="lesson-number">2</div><div class="lesson-time">...</div></div>
-              </div>
-            </div>
-            <div class="shift-schedule">
-              <div class="schedule-index">2 смена</div>
-              <div id="shift2-full">
-                <div class="lesson-item"><div class="lesson-number">0</div><div class="lesson-time">8:15 - 8:55</div></div>
-                <div class="lesson-item"><div class="lesson-number">1</div><div class="lesson-time">...</div></div>
               </div>
             </div>
           </div>
@@ -139,7 +132,7 @@
       </div>
     </div><!-- /bottom-container -->
 
-    <p id="last-deployment">Getting data...</p>
+    <p id="last-deployment"></p>
     <div class="full-schedule-panel" style="display: none">
       <div class="panel-content">
         <div class="day-navigation">
@@ -151,7 +144,7 @@
       </div>
     </div>
     <script>
-      console.log("Алина Бакун я люблю тебя ❤️");
+      console.log("Сайт сделал Клим Кошкарев");
       
       (function () {
         function updateVh() {
@@ -184,7 +177,23 @@
     </script>
     <script>
       const lessons1 = 0;
-      const lessons2 = 0;
+      const debugState = {
+        enabled: false,
+        time: "08:15:00",
+      };
+      const CLASS_COOKIE_KEY = "selectedClass";
+      const classList = ["7А", "7Б", "8А", "9А", "10И", "10С", "11И", "11У(Е/Л)"];
+      const classSchedule = {
+        "7А": { 1: ["Русский", "Русский", "Английский", "Английский", "Физика", "Физика", "Математический практикум"], 2: ["Алгебра", "Алгебра", "Биология", "Биология", "География", "География", "Статистика"], 3: ["Информатика/Технология", "Технология/Информатика", "Литература", "Литература", "Геометрия", "Геометрия"], 4: ["История", "История", "Информатика", "Физика/Информатика", "Физическая практика", "Россия", "Английский"], 5: ["Алгебра", "Алгебра", "Русский", "Русский", "Физкультура", "Физкультура"] },
+        "7Б": { 1: ["Физика", "Физика", "Русский", "Русский", "Английский", "Английский", "Статистика"], 2: ["География", "География", "Алгебра", "Алгебра", "Физкультура", "Физкультура"], 3: ["Геометрия", "Геометрия", "Информатика", "Технология/Информатика", "Литература", "Литература", "Химия"], 4: ["Информатика/Английский", "Английский/Информатика", "История", "История", "Математический практикум", "Россия", "Биология"], 5: ["Биология", "Биология", "Алгебра", "Алгебра", "Русский", "Русский", "История"] },
+        "8А": { 1: ["Английский", "Английский", "Геометрия", "Физкультура", "Физкультура"], 2: ["Алгебра", "Алгебра", "Литература", "Литература", "Биология", "Биология", "Русский"], 3: ["Геометрия", "Геометрия", "История", "История", "Физика", "Физика", "Статистика"], 4: ["География", "География", "Химия", "Россия", "Химия", "Технология/Английский", "Физика/Информатика", "Информатика/Физика"], 5: ["Русский", "Русский", "Алгебра", "Алгебра", "Общество", "Английский/Технология", "ОБЗР"] },
+        "9А": { 1: ["Химия", "Химия", "Русский", "Русский", "Алгебра", "Алгебра", "Литература"], 2: ["Информатика/Английский", "Технология/Английский", "Английский/Информатика", "Английский", "Геометрия"], 3: ["История", "История", "Биология", "Биология", "Литература", "Литература", "Физика"], 4: ["Физкультура", "Физкультура", "Алгебра", "Алгебра", "Общество", "География", "Общество", "Россия"], 5: ["ОБЗР", "Английский", "Русский", "Русский", "Физика", "Физика", "Статистика"] },
+        "10И": { 1: ["Литература", "Русский", "Русский", "Физика", "Физика", "Геометрия", "Статистика", "Информатика"], 2: ["Биология", "Химия", "История", "История", "Алгебра", "Алгебра", "Информатика"], 3: ["Английский", "Английский", "Геометрия", "Геометрия", "Физкультура", "Физкультура"], 4: ["Физкультура", "Физкультура", "ОБЗР", "Литература", "География", "Общество", "Литература", "Россия"], 5: ["Физика", "Физика", "Английский", "Английский", "Алгебра", "Алгебра", "Физика"] },
+        "10С": { 1: ["Геометрия", "География", "Статистика", "ОБЗР", "Геометрия", "Литература", "Литература", "Общество"], 2: ["История", "История", "Алгебра", "Алгебра", "Английский", "Информатика/Английский"], 3: ["Физика", "Физика", "Английский", "Английский", "Физкультура", "Физкультура"], 4: ["Физкультура", "Физкультура", "Русский", "Химия", "Русский", "Биология", "Литература", "Общество"], 5: ["Алгебра", "Алгебра", "Общество", "Общество", "Английский", "Общество", "Общество"] },
+        "11И": { 1: ["Общество", "Общество", "Алгебра", "Алгебра", "Алгебра", "Русский", "Русский", "Физика"], 2: ["Физкультура", "Физкультура", "Литература", "Литература", "История", "История", "Геометрия", "Информатика"], 3: ["Химия", "Биология", "Физика", "Физика", "Английский/Информатика", "Английский/Информатика", "Геометрия", "Геометрия"], 4: ["Алгебра", "Алгебра", "Английский", "Русский", "Россия", "Россия", "Литература", "География"], 5: ["Информатика", "ОБЗР", "Физика", "Физика", "Статистика"] },
+        "11У(Е/Л)": { 1: ["Алгебра", "Алгебра", "Химия/Общество", "Химия/Общество", "Общество/Химия", "Общество/Биология", "Русский"], 2: ["Физкультура", "Физкультура", "Английский", "Английский", "Литература", "Литература", "Биология/Общество"], 3: ["Русский", "Русский", "Геометрия", "Геометрия", "Химия/Общество", "Химия/Общество", "ОБЗР"], 4: ["Физика", "Физика", "Россия", "География", "Английский", "Литература", "Алгебра", "Алгебра"], 5: ["История", "История", "Биология/Английский", "Биология/Английский", "Информатика", "Статистика", "Статистика", "Геометрия"] }
+      };
+      let selectedClassIndex = 0;
       const reasons = {
         0: null,
         1: "Занятия отменены из за плохой погоды",
@@ -195,112 +204,66 @@
       const schedule = {
         1: {
           shift1: [
-            { lesson: "Классный час", start: "08:15", end: "08:45" },
-            { lesson: "1-й урок", start: "08:55", end: "09:35" },
-            { lesson: "2-й урок", start: "09:50", end: "10:30" },
-            { lesson: "3-й урок", start: "10:45", end: "11:25" },
-            { lesson: "4-й урок", start: "11:30", end: "12:10" },
-            { lesson: "5-й урок", start: "12:20", end: "13:00" },
-            { lesson: "6-й урок", start: "13:20", end: "14:00" },
-            { lesson: "7-й урок", start: "14:15", end: "14:55" },
-          ],
-          shift2: [
-            { lesson: "0-й урок", start: "12:20", end: "13:00" },
-            { lesson: "1-й урок", start: "13:20", end: "14:00" },
-            { lesson: "2-й урок", start: "14:15", end: "14:55" },
-            { lesson: "3-й урок", start: "15:10", end: "15:50" },
-            { lesson: "Классный час", start: "16:05", end: "16:35" },
-            { lesson: "4-й урок", start: "16:40", end: "17:20" },
-            { lesson: "5-й урок", start: "17:30", end: "18:10" },
-            { lesson: "6-й урок", start: "18:20", end: "19:00" },
+            { lesson: "1-й урок", start: "08:30", end: "09:10" },
+            { lesson: "2-й урок", start: "09:15", end: "09:55" },
+            { lesson: "3-й урок", start: "10:05", end: "10:45" },
+            { lesson: "4-й урок", start: "11:25", end: "12:05" },
+            { lesson: "5-й урок", start: "12:15", end: "12:55" },
+            { lesson: "6-й урок", start: "13:00", end: "13:40" },
+            { lesson: "7-й урок", start: "13:45", end: "14:25" },
+            { lesson: "8-й урок", start: "14:35", end: "15:15" },
           ],
         },
         2: {
           shift1: [
-            { lesson: "1-й урок", start: "08:15", end: "08:55" },
-            { lesson: "2-й урок", start: "09:05", end: "09:45" },
-            { lesson: "3-й урок", start: "10:00", end: "10:40" },
-            { lesson: "4-й урок", start: "11:00", end: "11:40" },
-            { lesson: "5-й урок", start: "11:50", end: "12:30" },
-            { lesson: "6-й урок", start: "12:50", end: "13:30" },
-            { lesson: "7-й урок", start: "13:50", end: "14:30" },
-          ],
-          shift2: [
-            { lesson: "0-й урок", start: "11:50", end: "12:30" },
-            { lesson: "1-й урок", start: "12:50", end: "13:30" },
-            { lesson: "2-й урок", start: "13:50", end: "14:30" },
-            { lesson: "3-й урок", start: "14:45", end: "15:25" },
-            { lesson: "4-й урок", start: "15:40", end: "16:20" },
-            { lesson: "5-й урок", start: "16:30", end: "17:10" },
-            { lesson: "6-й урок", start: "17:20", end: "18:00" },
+            { lesson: "1-й урок", start: "08:30", end: "09:10" },
+            { lesson: "2-й урок", start: "09:15", end: "09:55" },
+            { lesson: "3-й урок", start: "10:05", end: "10:45" },
+            { lesson: "4-й урок", start: "11:25", end: "12:05" },
+            { lesson: "5-й урок", start: "12:15", end: "12:55" },
+            { lesson: "6-й урок", start: "13:00", end: "13:40" },
+            { lesson: "7-й урок", start: "13:45", end: "14:25" },
+            { lesson: "8-й урок", start: "14:35", end: "15:15" },
           ],
         },
         3: {
           shift1: [
-            { lesson: "1-й урок", start: "08:15", end: "08:55" },
-            { lesson: "2-й урок", start: "09:05", end: "09:45" },
-            { lesson: "3-й урок", start: "10:00", end: "10:40" },
-            { lesson: "Классный час", start: "10:55", end: "11:25" },
-            { lesson: "4-й урок", start: "11:30", end: "12:10" },
-            { lesson: "5-й урок", start: "12:20", end: "13:00" },
-            { lesson: "6-й урок", start: "13:20", end: "14:00" },
-            { lesson: "7-й урок", start: "14:15", end: "14:55" },
-          ],
-          shift2: [
-            { lesson: "0-й урок", start: "12:20", end: "13:00" },
-            { lesson: "1-й урок", start: "13:20", end: "14:00" },
-            { lesson: "2-й урок", start: "14:15", end: "14:55" },
-            { lesson: "3-й урок", start: "15:10", end: "15:50" },
-            { lesson: "Классный час", start: "16:05", end: "16:35" },
-            { lesson: "4-й урок", start: "16:40", end: "17:20" },
-            { lesson: "5-й урок", start: "17:30", end: "18:10" },
-            { lesson: "6-й урок", start: "18:20", end: "19:00" },
+            { lesson: "1-й урок", start: "08:30", end: "09:10" },
+            { lesson: "2-й урок", start: "09:15", end: "09:55" },
+            { lesson: "3-й урок", start: "10:05", end: "10:45" },
+            { lesson: "4-й урок", start: "11:25", end: "12:05" },
+            { lesson: "5-й урок", start: "12:15", end: "12:55" },
+            { lesson: "6-й урок", start: "13:00", end: "13:40" },
+            { lesson: "7-й урок", start: "13:45", end: "14:25" },
+            { lesson: "8-й урок", start: "14:35", end: "15:15" },
           ],
         },
         4: {
           shift1: [
-            { lesson: "1-й урок", start: "08:15", end: "08:55" },
-            { lesson: "2-й урок", start: "09:05", end: "09:45" },
-            { lesson: "3-й урок", start: "10:00", end: "10:40" },
-            { lesson: "Классный час", start: "10:55", end: "11:25" },
-            { lesson: "4-й урок", start: "11:30", end: "12:10" },
-            { lesson: "5-й урок", start: "12:20", end: "13:00" },
-            { lesson: "6-й урок", start: "13:20", end: "14:00" },
-            { lesson: "7-й урок", start: "14:15", end: "14:55" },
-          ],
-          shift2: [
-            { lesson: "0-й урок", start: "12:20", end: "13:00" },
-            { lesson: "1-й урок", start: "13:20", end: "14:00" },
-            { lesson: "2-й урок", start: "14:15", end: "14:55" },
-            { lesson: "3-й урок", start: "15:10", end: "15:50" },
-            { lesson: "Классный час", start: "16:05", end: "16:35" },
-            { lesson: "4-й урок", start: "16:40", end: "17:20" },
-            { lesson: "5-й урок", start: "17:30", end: "18:10" },
-            { lesson: "6-й урок", start: "18:20", end: "19:00" },
+            { lesson: "1-й урок", start: "08:30", end: "09:10" },
+            { lesson: "2-й урок", start: "09:15", end: "09:55" },
+            { lesson: "3-й урок", start: "10:05", end: "10:45" },
+            { lesson: "4-й урок", start: "11:25", end: "12:05" },
+            { lesson: "5-й урок", start: "12:15", end: "12:55" },
+            { lesson: "6-й урок", start: "13:00", end: "13:40" },
+            { lesson: "7-й урок", start: "13:45", end: "14:25" },
+            { lesson: "8-й урок", start: "14:35", end: "15:15" },
           ],
         },
         5: {
           shift1: [
-            { lesson: "1-й урок", start: "08:15", end: "08:55" },
-            { lesson: "2-й урок", start: "09:05", end: "09:45" },
-            { lesson: "3-й урок", start: "10:00", end: "10:40" },
-            { lesson: "4-й урок", start: "11:00", end: "11:40" },
-            { lesson: "5-й урок", start: "11:50", end: "12:30" },
-            { lesson: "6-й урок", start: "12:50", end: "13:30" },
-            { lesson: "7-й урок", start: "13:50", end: "14:30" },
-          ],
-          shift2: [
-            { lesson: "0-й урок", start: "11:50", end: "12:30" },
-            { lesson: "1-й урок", start: "12:50", end: "13:30" },
-            { lesson: "2-й урок", start: "13:50", end: "14:30" },
-            { lesson: "3-й урок", start: "14:45", end: "15:25" },
-            { lesson: "4-й урок", start: "15:40", end: "16:20" },
-            { lesson: "5-й урок", start: "16:30", end: "17:10" },
-            { lesson: "6-й урок", start: "17:20", end: "18:00" },
+            { lesson: "1-й урок", start: "08:30", end: "09:10" },
+            { lesson: "2-й урок", start: "09:15", end: "09:55" },
+            { lesson: "3-й урок", start: "10:05", end: "10:45" },
+            { lesson: "4-й урок", start: "11:25", end: "12:05" },
+            { lesson: "5-й урок", start: "12:15", end: "12:55" },
+            { lesson: "6-й урок", start: "13:00", end: "13:40" },
+            { lesson: "7-й урок", start: "13:45", end: "14:25" },
+            { lesson: "8-й урок", start: "14:35", end: "15:15" },
           ],
         },
-        6: { shift1: [], shift2: [] },
-        0: { shift1: [], shift2: [] },
+        6: { shift1: [] },
+        0: { shift1: [] },
       };
 
       let lastUpdateTime = 0;
@@ -545,7 +508,7 @@
       }
 
       try {
-        if (!(lessons1 !== 0 && lessons2 !== 0)) updateMealDisplay();
+        if (lessons1 === 0) updateMealDisplay();
       } catch (e) { console.warn("Meal update failed", e); }
 
       const birthdayPeople = [
@@ -688,7 +651,6 @@
 
       function applyNoLessonsReasonToShifts() {
         const shift1Card = document.querySelector(".lesson-card:nth-child(1)");
-        const shift2Card = document.querySelector(".lesson-card:nth-child(2)");
         function getReasonContent(reasonId) {
           const reason = reasons[reasonId];
           if (!reason) return "";
@@ -703,16 +665,11 @@
           shift1Card.classList.remove("collapsed");
           shift1Card.classList.add("no-lessons");
         } else if (shift1Card) shift1Card.classList.remove("no-lessons");
-        if (lessons2 !== 0 && shift2Card) {
-          shift2Card.innerHTML = `<div class="no-lessons-header">2 смена</div><div class="no-lessons-content">${getReasonContent(lessons2)}</div>`;
-          shift2Card.classList.remove("collapsed");
-          shift2Card.classList.add("no-lessons");
-        } else if (shift2Card) shift2Card.classList.remove("no-lessons");
-        if (lessons1 !== 0 || lessons2 !== 0) document.body.classList.add("no-lessons");
+        if (lessons1 !== 0) document.body.classList.add("no-lessons");
         else document.body.classList.remove("no-lessons");
         const mealCard = document.getElementById("meal-table-container")?.closest(".lesson-card");
         if (mealCard) {
-          if (lessons1 !== 0 && lessons2 !== 0) mealCard.style.display = "none";
+          if (lessons1 !== 0) mealCard.style.display = "none";
           else {
             mealCard.style.display = "";
             if (!mealCard.querySelector("#meal-table-container")) {
@@ -724,11 +681,18 @@
       }
 
       function getCurrentTimeInKamchatkaContext() {
-        const now = new Date();
+        const now = getEffectiveNow();
         return `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
       }
-      function getCurrentDayOfWeek() {
+      function getEffectiveNow() {
         const now = new Date();
+        if (!debugState.enabled) return now;
+        const [hh, mm, ss] = (debugState.time || "08:15:00").split(":").map(Number);
+        now.setHours(hh || 0, mm || 0, ss || 0, 0);
+        return now;
+      }
+      function getCurrentDayOfWeek() {
+        const now = getEffectiveNow();
         const kamchatkaDate = new Date(now.getTime() + (12 * 60 + now.getTimezoneOffset()) * 60 * 1000);
         const day = kamchatkaDate.getDay();
         return day === 0 ? 0 : day;
@@ -777,7 +741,6 @@
         }
 
         renderShift("shift1", "shift1-full");
-        renderShift("shift2", "shift2-full");
 
         try {
             const mealsContainer = document.getElementById("meals-full");
@@ -788,9 +751,75 @@
         } catch (e) {}
       }
 
+      function setClassCookie(index) {
+        const maxAge = 60 * 60 * 24 * 365;
+        document.cookie = `${CLASS_COOKIE_KEY}=${index}; path=/; max-age=${maxAge}; SameSite=Lax`;
+      }
+
+      function getClassCookie() {
+        const match = document.cookie.match(new RegExp(`(?:^|; )${CLASS_COOKIE_KEY}=([^;]*)`));
+        if (!match) return 0;
+        const parsed = Number(match[1]);
+        return Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), classList.length - 1) : 0;
+      }
+
+      function renderClassDaySchedule() {
+        const day = getCurrentDayOfWeek();
+        const currentTime = getCurrentTimeInKamchatkaContext();
+        const now = getEffectiveNow();
+        const offsetSeconds = (12 * 60 + now.getTimezoneOffset()) * 60;
+        let currentSeconds = (timeToSeconds(currentTime) + offsetSeconds) % 86400;
+        if (currentSeconds < 0) currentSeconds += 86400;
+        const className = classList[selectedClassIndex] || classList[0];
+        const classNameEl = document.getElementById("selectedClassName");
+        const scheduleEl = document.getElementById("classDaySchedule");
+        if (classNameEl) classNameEl.textContent = className;
+        if (!scheduleEl) return;
+        if (day === 0 || day === 6) {
+          scheduleEl.innerHTML = `<div class="class-empty">Сегодня выходной</div>`;
+          return;
+        }
+        const lessons = classSchedule[className]?.[day] || [];
+        if (!lessons.length) {
+          scheduleEl.innerHTML = `<div class="class-empty">Для этого класса нет данных на сегодня</div>`;
+          return;
+        }
+        const timings = schedule[day]?.shift1 || [];
+        scheduleEl.innerHTML = lessons.map((lesson, index) => {
+          const t = timings[index];
+          const isCurrent = t ? isTimeBetween(currentTime, t.start, t.end) : false;
+          const isPast = t ? (!isCurrent && currentSeconds > timeToSeconds(t.end)) : false;
+          const timeLabel = t ? ` (${t.start} - ${t.end})` : "";
+          return `<div class="lesson-item ${isCurrent ? "current" : ""} ${isPast ? "past" : ""}"><div class="lesson-number">${index + 1}</div><div class="lesson-time">${escapeHtml(lesson)}${timeLabel}</div></div>`;
+        }).join("");
+      }
+
+      function initClassSlider() {
+        const prevBtn = document.getElementById("classPrev");
+        const nextBtn = document.getElementById("classNext");
+        if (!prevBtn || !nextBtn) return;
+        selectedClassIndex = getClassCookie();
+        const updateNavState = () => {
+          prevBtn.disabled = selectedClassIndex <= 0;
+          nextBtn.disabled = selectedClassIndex >= classList.length - 1;
+        };
+        const changeClass = (delta) => {
+          const nextIndex = selectedClassIndex + delta;
+          if (nextIndex < 0 || nextIndex > classList.length - 1) return;
+          selectedClassIndex = nextIndex;
+          setClassCookie(selectedClassIndex);
+          renderClassDaySchedule();
+          updateNavState();
+        };
+        prevBtn.addEventListener("click", () => changeClass(-1));
+        nextBtn.addEventListener("click", () => changeClass(1));
+        renderClassDaySchedule();
+        updateNavState();
+      }
+
 
       function calculateRemainingTime(curr, end) {
-        const now = new Date();
+        const now = getEffectiveNow();
         const offset = (12 * 60 + now.getTimezoneOffset()) * 60;
         let currSec = (timeToSeconds(curr) + offset) % 86400;
         if (currSec < 0) currSec += 86400;
@@ -815,7 +844,7 @@
       }
 
       function updateProgressBar(bar, curr, start, end) {
-        const now = new Date();
+        const now = getEffectiveNow();
         const offset = (12 * 60 + now.getTimezoneOffset()) * 60;
         let currSec = (timeToSeconds(curr) + offset) % 86400;
         if (currSec < 0) currSec += 86400;
@@ -830,7 +859,7 @@
       }
 
       function findNextLessonTime(shiftData, curr, day, shiftKey) {
-        const now = new Date();
+        const now = getEffectiveNow();
         const offset = (12 * 60 + now.getTimezoneOffset()) * 60;
         let currSec = (timeToSeconds(curr) + offset) % 86400;
         if (currSec < 0) currSec += 86400;
@@ -842,7 +871,7 @@
         }
         if (next) {
           const [h, m] = next.start.split(":").map(Number);
-          let nDate = new Date();
+          let nDate = new Date(now);
           nDate.setDate(nDate.getDate() + (nextDay - day));
           nDate.setHours(h, m, 0, 0);
           nDate = new Date(nDate.getTime() - offset * 1000);
@@ -905,7 +934,7 @@
       }
 
       function getLocalTimes(s, e) {
-        const now = new Date(), [sh, sm] = s.split(":").map(Number), [eh, em] = e.split(":").map(Number);
+        const now = getEffectiveNow(), [sh, sm] = s.split(":").map(Number), [eh, em] = e.split(":").map(Number);
         const sd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sh, sm), ed = new Date(now.getFullYear(), now.getMonth(), now.getDate(), eh, em);
         const off = 12 * 60 + now.getTimezoneOffset();
         sd.setMinutes(sd.getMinutes() - off); ed.setMinutes(ed.getMinutes() - off);
@@ -913,7 +942,7 @@
       }
 
       function updateThemeAndBackground() {
-        const now = new Date(), off = 12 * 60 + now.getTimezoneOffset(), kDate = new Date(now.getTime() + off * 60 * 1000), hour = kDate.getHours();
+        const now = getEffectiveNow(), off = 12 * 60 + now.getTimezoneOffset(), kDate = new Date(now.getTime() + off * 60 * 1000), hour = kDate.getHours();
         const names = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
         document.getElementById("dayOfWeek").textContent = names[getCurrentDayOfWeek()];
         let bg, color, isNight = hour < 6 || hour >= 20;
@@ -937,16 +966,48 @@
         renderBirthdayCards();
         applyNoLessonsReasonToShifts();
         const day = getCurrentDayOfWeek(), today = schedule[day];
-        const shifts = [
-          { name: "lesson1", data: today?.shift1, key: "shift1", cancel: lessons1 },
-          { name: "lesson2", data: today?.shift2, key: "shift2", cancel: lessons2 },
-        ];
+        const shifts = [{ name: "lesson1", data: today?.shift1, key: "shift1", cancel: lessons1 }];
         shifts.forEach((s) => {
           const nameEl = document.getElementById(`${s.name}-name`);
           if (s.cancel === 0 && nameEl) updateShiftDisplay(s.data, nameEl, document.getElementById(`${s.name}-remaining`), document.getElementById(`${s.name}-start-time`), document.getElementById(`${s.name}-end-time`), document.getElementById(`${s.name}-progress`), s.key);
         });
-        try { if (!(lessons1 !== 0 && lessons2 !== 0)) updateMealDisplay(); } catch (e) {}
+        try { if (lessons1 === 0) updateMealDisplay(); } catch (e) {}
         renderFullSchedule();
+        renderClassDaySchedule();
+      }
+
+      function initDebugMenu() {
+        const toggleBtn = document.getElementById("debugToggleBtn");
+        const panel = document.getElementById("debugPanel");
+        const input = document.getElementById("debugTimeInput");
+        const applyBtn = document.getElementById("debugApplyBtn");
+        const resetBtn = document.getElementById("debugResetBtn");
+        const stateLabel = document.getElementById("debugStateLabel");
+        if (!toggleBtn || !panel || !input || !applyBtn || !resetBtn || !stateLabel) return;
+
+        const setStateLabel = () => {
+          stateLabel.textContent = debugState.enabled ? `Режим: ${debugState.time}` : "Режим: реальное время";
+        };
+
+        toggleBtn.addEventListener("click", () => {
+          panel.style.display = panel.style.display === "none" ? "block" : "none";
+        });
+
+        applyBtn.addEventListener("click", () => {
+          const v = input.value || "08:15:00";
+          debugState.time = v.length === 5 ? `${v}:00` : v;
+          debugState.enabled = true;
+          setStateLabel();
+          updateSchedule();
+        });
+
+        resetBtn.addEventListener("click", () => {
+          debugState.enabled = false;
+          setStateLabel();
+          updateSchedule();
+        });
+
+        setStateLabel();
       }
 
       function createStars() {
@@ -1058,17 +1119,14 @@
         slider.appendChild(viewport);
         for (let d = 1; d <= 5; d++) {
           const dayEl = document.createElement("div"); dayEl.className = "day-schedule";
-          ["shift1", "shift2"].forEach(k => {
-            const sEl = document.createElement("div"); sEl.className = "shift-schedule";
-            sEl.innerHTML = `<div class="schedule-index">${k === "shift1" ? "1 смена" : "2 смена"}</div>`;
-            schedule[d][k].forEach((l, index) => {
-              const lEl = document.createElement("div"); lEl.className = "lesson-item";
-              const badge = getLessonBadge(l.lesson, index);
-              lEl.innerHTML = `<div class="lesson-number">${badge}</div><div class="lesson-time">${l.start} - ${l.end}</div>`;
-              sEl.appendChild(lEl);
-            });
-            dayEl.appendChild(sEl);
+          const sEl = document.createElement("div"); sEl.className = "shift-schedule";
+          schedule[d].shift1.forEach((l, index) => {
+            const lEl = document.createElement("div"); lEl.className = "lesson-item";
+            const badge = getLessonBadge(l.lesson, index);
+            lEl.innerHTML = `<div class="lesson-number">${badge}</div><div class="lesson-time">${l.start} - ${l.end}</div>`;
+            sEl.appendChild(lEl);
           });
+          dayEl.appendChild(sEl);
           track.appendChild(dayEl);
         }
       }
@@ -1107,6 +1165,8 @@
       }, true);
 
       document.addEventListener("DOMContentLoaded", () => {
+        initDebugMenu();
+        initClassSlider();
         updateSchedule();
         setInterval(updateSchedule, 1000);
       });
@@ -1151,7 +1211,7 @@
             fetch(data[0].statuses_url, { headers: { Accept: "application/vnd.github.v3+json" } })
               .then(sr => sr.json()).then(st => {
                 const s = st[0]?.state === "success" ? "OK" : (st[0]?.state === "failure" ? "ERR" : "Work");
-                if (el) el.innerHTML = `Меню взято с сайта школы <br> Изменение кода: ${d.toLocaleDateString("ru-RU")} ${d.toLocaleTimeString("ru-RU")} (${s})`;
+                if (el) el.innerHTML = ` <br> Изменение кода: ${d.toLocaleDateString("ru-RU")} ${d.toLocaleTimeString("ru-RU")} (${s})`;
               });
           }).catch(() => { if (el) el.textContent = ""; });
       }
