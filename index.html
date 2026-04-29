@@ -984,6 +984,12 @@
         const resetBtn = document.getElementById("debugResetBtn");
         const stateLabel = document.getElementById("debugStateLabel");
         if (!toggleBtn || !panel || !input || !applyBtn || !resetBtn || !stateLabel) return;
+        const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+        if (!isDesktop) {
+          toggleBtn.remove();
+          panel.remove();
+          return;
+        }
 
         const setStateLabel = () => {
           stateLabel.textContent = debugState.enabled ? `Режим: ${debugState.time}` : "Режим: реальное время";
